@@ -2,106 +2,73 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from numpy.linalg import norm
+from PIL import Image
 
+Im = Image.open('tiger.jfif','r')
+Im.show()
+pix_val = list(Im.getdata())
+pix_val = np.array(pix_val)    #306585*3
 
-def read_file(file,A):
-    f=open(file,"r")
-    for line in f:
-        num1,num2=line.split()
-        A.append([float(num1),float(num2)])
-    return A
+k=4
 
+k_mean = []
+for i in range(100,20*k+100,20):
+    k_mean.append([i,i,i])
+k_mean = np.array(k_mean)
 
-# def mean(x):
-#     return [np.sum(x[:,0])/x.shape[0],np.sum(x[:,1])/x.shape[0]]
-
-mean = np.zeros((2,2))
-mean[0] = [10,10]
-mean[1] = [7,10]
-
-
-def assignment(data,mean):
-    r = np.zeros((1,data.shape[0]))
-    print(r.shape)
-    #return r
+def assignment(data,k_mean):
+    r = np.zeros((1,data.shape[0]),dtype=int)
+    l2 = [0]*k_mean.shape[0]
     for i in range(data.shape[0]):
-        l2_0 = norm(data[i]-mean[0],2)
-        l2_1 = norm(data[i]-mean[1],2)
-        if l2_0 > l2_1:
-            r[0][i] = 1
-        else:
-            r[0][i] = 0
-    return r        
-    
-def find_mean(r,data):
-    sum0 = np.zeros((1,2))
-    sum1 = np.zeros((1,2))
-    mean = np.zeros((2,2))
-    count0 = 0
-    count1 = 0
+        for k in range(k_mean.shape[0]):
+            l2[k] = norm(data[i]-k_mean[k],2)
+        min_ind = np.argmin(l2)    
+        r[0][i] = min_ind    
+    return r
+
+def maximise(r,data,k):
+    mean = np.zeros((k,3))
+    sum_data = np.zeros((k,3))
+    count = [1]*mean.shape[0]
     for i in range(data.shape[0]):
-        if r[0][i]==0:
-            sum0=sum0+data[i]
-            count0+=1
-        else:
-            sum1=sum1+data[i]
-            count1+=1
-    mean[0] = sum0/count0
-    mean[1] = sum1/count1
+        sum_data[r[0][i]][0]+=data[i][0]
+        sum_data[r[0][i]][1]+=data[i][1]
+        sum_data[r[0][i]][2]+=data[i][2]
+        count[r[0][i]] = count[r[0][i]]+1
+    for i in range(mean.shape[0]):
+        mean[i] = sum_data[i]/count[i]
+        
     return mean
 
-eps = 0.1    
-
-def diff(mean,prev_mean,eps):
-    dis = mean-prev_mean
+def diff(k_mean,prev_k_mean,eps):
+    dis = k_mean-prev_k_mean
     for i in range(dis.shape[0]):
         d = norm(dis[i],2)
+        print(d)
         if d > eps:
             return False
         else:
             return True
 
+eps = 5
 
-def plot(data,r,c1,c2):
-    dat_1=[]
-    dat_2=[]
-    for i in range(data.shape[0]):
-        if(r[0][i]==0):
-            dat_1.append([data[i][0] ,data[i][1]])
-        else:
-            dat_2.append([data[i][0],data[i][1]])
-    dat_1=np.array(dat_1)
-    dat_2=np.array(dat_2)
-    dict_={1:'violet',2:'mediumspringgreen'}
-    dict_2 = {1:'blue',2:'darkgreen'}
-    patch1 = mpatches.Patch(color=dict_[c1], label='class{}'.format(c1))
-    patch2 = mpatches.Patch(color=dict_[c2], label='class{}'.format(c2))
-    fig , ax = plt.subplots()
-    ax = plt.scatter(dat_1[:,0], dat_1[:,1], s=2, c=dict_[c1])
-    ax = plt.scatter(dat_2[:,0], dat_2[:,1], s=2, c=dict_[c2])
-    ax = plt.legend(handles=[patch2,patch1])
-    #ax = plt.scatter(data1[:,0], data1[:,1], s=2, c=dict_2[c1])
-    #ax = plt.scatter(data2[:,0], data2[:,1], s=2, c=dict_2[c2])
-    plt.show()
+while True:
+    #ASSIGNMENT STEP
+    r = assignment(pix_val,k_mean)
+    #MAXIMISATION STEP
+    prev_k_mean = k_mean
+    k_mean = maximise(r,pix_val,k)
+    if diff(k_mean,prev_k_mean,eps):
+        break
 
-if __name__ == "__main__":
-    data1= []
-    data2= []
-    # data3= []
-    data1=read_file("../data/Class2_1.txt", data1)
-    data2=read_file("../data/Class2_2.txt", data2)
-    # data3=read_file("../data/Class1_3.txt", data2)
+width, height = Im.size
+r = np.reshape(r,(height,width))
+k_mean = k_mean.astype(int)
 
-    data = np.concatenate((data1,data2),axis=0)
-    # data = np.concatenate((data,data3),axis=0)
-    while True:
-        #ASSIGNMENT STEP
-        r = assignment(data,mean)
-        #print(r)
-        #MAXIMISATION STEP
-        prev_mean = mean
-        mean = find_mean(r,data)
-        if diff(mean,prev_mean,eps):
-            break
-        print(mean)
-    plot(data,r,1,2)
+type(k_mean)
+
+for y in range(height):
+    for x in range(width):
+        Im.putpixel( (x, y), tuple(k_mean[r[y][x]]))    # putpixel provides read and write access to PIL.Image data 
+Im.show()                                               # at a pixel level.
+Im.save("hello.jpg")
